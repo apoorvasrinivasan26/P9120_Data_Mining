@@ -9,6 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(MASS)
+library(splines)
 ```
 
 # Question 4
@@ -86,4 +87,117 @@ Given that the test error and the standard errors are similar for all three mode
 
 
 # Question 3
+
+```{r}
+set.seed(20)
+x = runif(50, min = 0, max = 1)
+```
+
+
+## Generating 100 training sets
+
+```{r}
+gen_train = list()
+for (i in 1:100) {
+set.seed(i)
+y = sin(2*pi*x^3)^3 + rnorm(50, mean = 0, sd = 1)
+gen_train[[i]] = cbind(x,y)
+}
+  
+```
+
+### OLS with linear model
+
+```{r}
+ols_linear_pred = list()
+for (i in 1:100) {
+fit = lm(y~x, data = as.data.frame(gen_train[[i]]))
+pred = predict(fit)
+ols_linear_pred[[i]] = pred
+}
+
+ols_linear_pred = bind_cols(ols_linear_pred)
+```
+
+
+### OLS with cubic polynomial model
+
+```{r}
+ols_cub_pred = list()
+for (i in 1:100) {
+fit = lm(y~poly(x,3), data = as.data.frame(gen_train[[i]]))
+pred = predict(fit)
+ols_cub_pred[[i]] = pred
+}
+ols_cub_pred = bind_cols(ols_cub_pred)
+```
+
+
+### Cubic spline (or B-spline) with 2 knots at 0.33 and 0.66.
+
+```{r}
+cub_spline_pred = list()
+for (i in 1:100) {
+  fit = lm(y ~bs(x, 0.33, 0.66), data = as.data.frame(gen_train[i]))
+  pred = predict(fit)
+  cub_spline_pred[[i]] = pred
+}
+cub_spline_pred = bind_cols(cub_spline_pred)
+```
+
+Fit natural cubic spline with 5 knots at 0.1, 0.3, 0.5, 0.7 and 0.9 in each training set and get the vector of fitted value 
+
+```{r}
+ncub_spline_pred = list()
+for (i in 1:100) {
+fit = lm(y~ns(x,knots=c(0.1,0.3,0.5,0.7,0.9)), data = as.data.frame(gen_train[[i]]))
+pred = predict(fit)
+ncub_spline_pred[[i]] = pred
+}
+ncub_spline_pred = bind_cols(ncub_spline_pred)
+```
+
+### Fit smoothing spline with tuning parameter chosen by GCV in each training set and get the vector of fitted value
+
+```{r}
+smooth_spline_pred = list()
+for (i in 1:100) {
+fit = smooth.spline(x=gen_train[[i]][,1], y =gen_train[[i]][,2], cv=FALSE)
+pred = predict(fit)$y
+smooth_spline_pred[[i]] = pred
+}
+smooth_spline_pred = bind_cols(smooth_spline_pred)
+```
+
+
+## Calculating pointwise variance
+
+```{r}
+ols_linear_var = apply(ols_linear_pred, 1, var)
+ols_cub_var = apply(ols_cub_pred, 1, var)
+cub_spline_var = apply(cub_spline_pred, 1, var)
+ncub_spline_var = apply(ncub_spline_pred, 1,var)
+smooth_spline_var = apply(smooth_spline_pred, 1,var)
+var_df = data_frame(x,ols_linear_var,ols_cub_var,cub_spline_var,ncub_spline_var,smooth_spline_var)
+```
+
+##Plotting poitwise variance
+
+```{r}
+ggplot(var_df) +
+  geom_line(aes(x = x, y = ols_linear_var, color = "OLS Linear Spline")) +
+  geom_point(aes(x = x, y = ols_linear_var, color = "OLS Linear Spline")) +
+  geom_line(aes(x = x, y = ols_cub_var, color = "OLS Cubic Spline")) +
+geom_point(aes(x = x, y = ols_cub_var, color = "OLS Cubic Spline")) +
+geom_line(aes(x = x, y = cub_spline_var, color = "Cubic Spline")) +
+geom_point(aes(x = x, y = cub_spline_var, color = "Cubic Spline")) +
+geom_line(aes(x = x, y = ncub_spline_var, color = "Natural Cubic Spline")) +
+geom_point(aes(x = x, y = ncub_spline_var, color = "Natural Cubic Spline")) +
+geom_line(aes(x = x, y = smooth_spline_var, color = "Smoothing Spline")) +
+geom_point(aes(x = x, y = smooth_spline_var, color = "Smoothing Spline")) +
+theme_bw()+
+labs(title = "Simulation results of pointwise variance between 5 models",
+x = "X",
+y = "Pointwise variance")
+```
 
