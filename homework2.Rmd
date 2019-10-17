@@ -1,0 +1,89 @@
+---
+title: "hw2"
+author: "Apoorva Srinivasan"
+date: "10/16/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(MASS)
+```
+
+# Question 4
+```{r}
+SAheart = read.table("http://www-stat.stanford.edu/~tibs/ElemStatLearn/datasets/SAheart.data",sep=",",head=T,row.names=1)
+```
+
+
+```{r}
+train = SAheart[1:300 ,]
+test = SAheart[301:462,]
+```
+
+```{r}
+log_model = glm(chd ~ ., family = binomial(link = "logit"), data = train)
+summary(log_model)
+```
+
+```{r}
+fitted.results = predict(log_model, test, type = "response")
+fitted.results <- ifelse(fitted.results > 0.5,1,0) #picking 0.5 as the boundry
+log_error = mean((test$chd - fitted.results)^2) 
+log_error
+##same as log_error = mean(fitted.results != test$chd)
+
+std_log_error = sd((test$chd - fitted.results)^2)/ sqrt(nrow(test))
+std_log_error
+```
+
+
+### LDA
+
+```{r}
+lda_model = lda(chd~., data = train)
+summary(lda_model)
+
+```
+
+```{r}
+lda_pred = predict(lda_model, test)$class
+lda_error = mean((test$chd - lda_pred)^2) 
+lda_error
+lda_pred = as.numeric(lda_pred)
+test$chd = as.numeric(test$chd)
+std_lda_error = sd((test$chd - lda_pred)^2)/ sqrt(nrow(test))
+std_lda_error
+
+```
+
+## QDA
+
+```{r}
+qda_model = qda(chd~., data = train)
+qda_model$means
+```
+
+```{r}
+qda_pred = predict(qda_model, test)$class
+qda_pred = as.numeric(qda_pred)
+qda_error = mean((qda_pred - test$chd)^2)
+std_qda_error = sd((qda_pred - test$chd)^2)/sqrt(nrow(test))
+```
+
+```{r}
+log = cbind("Logistic Regression",log_error,std_log_error)
+lda = cbind("LDA",lda_error, std_lda_error)
+qda = cbind("QDA",qda_error, std_qda_error)
+
+summary_table = rbind(log, lda, qda)
+colnames(summary_table) = c("Model", "Test Error", "Std Error") 
+
+```
+
+Given that the test error and the standard errors are similar for all three models, I'd pick logistic since it's the easiest to interpret.
+
+
+# Question 3
+
